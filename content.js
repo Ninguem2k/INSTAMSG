@@ -258,7 +258,8 @@ async function savePerson() {
 
   const username = extractUsername(text);
   if (!username) {
-    showToast('InstaMSG: Texto nao parece um @usuario valido.');
+    const preview = text.length > 60 ? text.slice(0, 60) + '...' : text;
+    showToast(`InstaMSG: Nao parece @usuario. Clip: "${preview}"`);
     return;
   }
 
