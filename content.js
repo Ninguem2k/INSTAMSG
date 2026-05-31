@@ -3,12 +3,14 @@
 // ── Constants ──────────────────────────────────────────────
 const TOAST_DURATION = 2500;
 const SHORTCUT_DEFAULTS = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
+const SAVE_PERSON_SHORTCUT_DEFAULTS = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'o' };
 const DONATION_PIX_KEY = 'ninguem2k@proton.me';
 const DONATION_MSG_INTERVAL = 10;
 const DONATION_HIDE_DAYS = 30;
 
 // ── State ──────────────────────────────────────────────────
 let currentShortcut = { ...SHORTCUT_DEFAULTS };
+let currentSavePersonShortcut = { ...SAVE_PERSON_SHORTCUT_DEFAULTS };
 let keydownHandler = null;
 let attached = false;
 let lastClickedUsername = null;
@@ -201,10 +203,18 @@ function buildShortcutHandler(sc) {
   };
 }
 
-// ── Ctrl+O: save person ─────────────────────────────────────
+// ── Save person shortcut ─────────────────────────────────────
 function buildSavePersonHandler() {
+  const sc = currentSavePersonShortcut;
   return function handleKeydown(e) {
-    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'o') {
+    if (!sc || !sc.key) return;
+
+    const ctrlMatch = sc.ctrlKey ? (e.ctrlKey || e.metaKey) : (!e.ctrlKey && !e.metaKey);
+    const shiftMatch = sc.shiftKey ? e.shiftKey : !e.shiftKey;
+    const altMatch = sc.altKey ? e.altKey : !e.altKey;
+    const metaMatch = sc.metaKey ? e.metaKey : true;
+
+    if (ctrlMatch && shiftMatch && altMatch && metaMatch && e.key.toLowerCase() === sc.key.toLowerCase()) {
       e.preventDefault();
       e.stopPropagation();
       savePerson();
@@ -256,8 +266,9 @@ function attachListener() {
 }
 
 async function initShortcut() {
-  const result = await chrome.storage.local.get('shortcut');
+  const result = await chrome.storage.local.get(['shortcut', 'savePersonShortcut']);
   currentShortcut = result.shortcut || { ...SHORTCUT_DEFAULTS };
+  currentSavePersonShortcut = result.savePersonShortcut || { ...SAVE_PERSON_SHORTCUT_DEFAULTS };
   attachListener();
 }
 
@@ -305,8 +316,10 @@ window.addEventListener('hashchange', () => { lastUrl = location.href; attachLis
 
 // ── Storage change listener ────────────────────────────────
 chrome.storage.onChanged.addListener((changes, areaName) => {
-  if (areaName === 'local' && changes.shortcut) {
-    currentShortcut = changes.shortcut.newValue || { ...SHORTCUT_DEFAULTS };
+  if (areaName !== 'local') return;
+  if (changes.shortcut || changes.savePersonShortcut) {
+    if (changes.shortcut) currentShortcut = changes.shortcut.newValue || { ...SHORTCUT_DEFAULTS };
+    if (changes.savePersonShortcut) currentSavePersonShortcut = changes.savePersonShortcut.newValue || { ...SAVE_PERSON_SHORTCUT_DEFAULTS };
     attached = false;
     attachListener();
   }

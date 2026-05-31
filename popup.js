@@ -38,6 +38,12 @@ const shortcutDisplay = $('#shortcut-display');
 const shortcutHint = $('#shortcut-hint');
 const shortcutConflict = $('#shortcut-conflict');
 const shortcutDesc = $('#shortcut-desc');
+const savePersonCapture = $('#saveperson-capture');
+const savePersonDisplay = $('#saveperson-display');
+const savePersonHint = $('#saveperson-hint');
+const savePersonConflict = $('#saveperson-conflict');
+const savePersonDesc = $('#saveperson-desc');
+const peopleHint = $('#people-hint');
 const statusIndex = $('#status-index');
 const btnCopyNow = $('#btn-copy-now');
 const copyToast = $('#copy-toast');
@@ -73,7 +79,8 @@ const DONATION_HIDE_DAYS = 30;      // hide duration when user clicks "ja doei"
 let groups = {};
 let activeGroupId = null;
 let shortcut = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
-let isRecording = false;
+let savePersonShortcut = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'o' };
+let recordingTarget = null; // 'shortcut' | 'saveperson' | null
 let totalCopies = 0;
 let donationDismissedUntil = 0;
 let people = [];
@@ -126,7 +133,7 @@ async function loadSettings() {
     'baseText', 'groups', 'activeGroupId', 'shortcut',
     'apiProvider', 'apiKey', 'ollamaUrl', 'ollamaModel',
     'temperature', 'numVariations', 'language', '_schemaVersion',
-    'totalCopies', 'donationDismissedUntil', 'people'
+    'totalCopies', 'donationDismissedUntil', 'people', 'savePersonShortcut'
   ]);
 
   await migrateIfNeeded(result);
@@ -134,6 +141,7 @@ async function loadSettings() {
   groups = result.groups || {};
   activeGroupId = result.activeGroupId;
   shortcut = result.shortcut || { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
+  savePersonShortcut = result.savePersonShortcut || { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'o' };
   totalCopies = result.totalCopies || 0;
   donationDismissedUntil = result.donationDismissedUntil || 0;
   people = result.people || [];
@@ -167,6 +175,7 @@ async function loadSettings() {
   renderMessageList();
   renderPeopleList();
   renderShortcutDisplay();
+  renderSavePersonShortcutDisplay();
   updateShortcutStatus();
   toggleClearGenBtn();
 
@@ -758,16 +767,35 @@ function highlightMessageItem(idx) {
 
 // ── Shortcut: Render display ───────────────────────────────
 function renderShortcutDisplay() {
-  const parts = [];
-  if (shortcut.ctrlKey) parts.push('Ctrl');
-  if (shortcut.shiftKey) parts.push('Shift');
-  if (shortcut.altKey) parts.push('Alt');
-  if (shortcut.metaKey) parts.push('Cmd');
-  if (shortcut.key) parts.push(shortcut.key.toUpperCase());
-
-  const combo = parts.join(' + ') || 'Nenhum';
+  const combo = shortcutToText(shortcut);
   shortcutDisplay.textContent = combo;
   shortcutDesc.innerHTML = `Pressione <strong>${combo}</strong> em qualquer pagina do Instagram para copiar a proxima mensagem da lista e alternar ciclicamente.`;
+
+  // Also update people hint
+  if (peopleHint) {
+    const spCombo = shortcutToText(savePersonShortcut);
+    peopleHint.innerHTML = `No Instagram, clique no <strong>@usuario</strong> e pressione <strong>${spCombo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
+  }
+}
+
+function shortcutToText(sc) {
+  const parts = [];
+  if (sc.ctrlKey) parts.push('Ctrl');
+  if (sc.shiftKey) parts.push('Shift');
+  if (sc.altKey) parts.push('Alt');
+  if (sc.metaKey) parts.push('Cmd');
+  if (sc.key) parts.push(sc.key.toUpperCase());
+  return parts.join(' + ') || 'Nenhum';
+}
+
+function renderSavePersonShortcutDisplay() {
+  const combo = shortcutToText(savePersonShortcut);
+  savePersonDisplay.textContent = combo;
+  savePersonDesc.innerHTML = `Pressione <strong>${combo}</strong> em qualquer pagina do Instagram para salvar o @usuario clicado na lista de pessoas.`;
+
+  if (peopleHint) {
+    peopleHint.innerHTML = `No Instagram, clique no <strong>@usuario</strong> e pressione <strong>${combo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
+  }
 }
 
 // ── Shortcut: Conflict check ───────────────────────────────
@@ -799,28 +827,45 @@ async function saveShortcut() {
   await chrome.storage.local.set({ shortcut });
 }
 
-// ── Shortcut: Key capture ──────────────────────────────────
-shortcutCapture.addEventListener('focus', () => {
-  isRecording = true;
-  shortcutCapture.classList.add('recording');
-  shortcutHint.textContent = 'Pressione a combinacao desejada...';
-});
+async function saveSavePersonShortcut() {
+  await chrome.storage.local.set({ savePersonShortcut });
+}
 
-shortcutCapture.addEventListener('blur', () => {
-  isRecording = false;
+// ── Shortcut: Key capture (unified) ─────────────────────────
+function startRecording(target) {
+  recordingTarget = target;
+  if (target === 'shortcut') {
+    shortcutCapture.classList.add('recording');
+    shortcutHint.textContent = 'Pressione a combinacao desejada...';
+  } else {
+    savePersonCapture.classList.add('recording');
+    savePersonHint.textContent = 'Pressione a combinacao desejada...';
+  }
+}
+
+function stopRecording() {
+  recordingTarget = null;
   shortcutCapture.classList.remove('recording');
   shortcutHint.textContent = 'Clique aqui e pressione a nova tecla';
-});
+  savePersonCapture.classList.remove('recording');
+  savePersonHint.textContent = 'Clique aqui e pressione a nova tecla';
+}
 
-shortcutCapture.addEventListener('keydown', (e) => {
-  if (!isRecording) return;
+shortcutCapture.addEventListener('focus', () => startRecording('shortcut'));
+shortcutCapture.addEventListener('blur', () => { if (recordingTarget === 'shortcut') stopRecording(); });
+
+savePersonCapture.addEventListener('focus', () => startRecording('saveperson'));
+savePersonCapture.addEventListener('blur', () => { if (recordingTarget === 'saveperson') stopRecording(); });
+
+// Single keydown handler on document for both captures
+document.addEventListener('keydown', (e) => {
+  if (!recordingTarget) return;
   e.preventDefault();
   e.stopPropagation();
 
-  // Ignore standalone modifier keys
   if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return;
 
-  shortcut = {
+  const newShortcut = {
     ctrlKey: e.ctrlKey || e.metaKey,
     shiftKey: e.shiftKey,
     altKey: e.altKey,
@@ -828,15 +873,23 @@ shortcutCapture.addEventListener('keydown', (e) => {
     key: e.key.toLowerCase()
   };
 
-  renderShortcutDisplay();
-  checkShortcutConflicts();
-  saveShortcut();
+  if (recordingTarget === 'shortcut') {
+    shortcut = newShortcut;
+    renderShortcutDisplay();
+    checkShortcutConflicts();
+    saveShortcut();
+    statusBar.textContent = 'Atalho de copiar atualizado.';
+  } else {
+    savePersonShortcut = newShortcut;
+    renderSavePersonShortcutDisplay();
+    saveSavePersonShortcut();
+    statusBar.textContent = 'Atalho de salvar pessoa atualizado.';
+  }
 
-  isRecording = false;
-  shortcutCapture.classList.remove('recording');
+  stopRecording();
   shortcutCapture.blur();
-  statusBar.textContent = 'Atalho atualizado.';
-});
+  savePersonCapture.blur();
+}, true);
 
 // ── Shortcut status ────────────────────────────────────────
 function updateShortcutStatus() {
@@ -909,6 +962,10 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     shortcut = changes.shortcut.newValue || { ctrlKey: true, key: 'i' };
     renderShortcutDisplay();
     checkShortcutConflicts();
+  }
+  if (changes.savePersonShortcut) {
+    savePersonShortcut = changes.savePersonShortcut.newValue || { ctrlKey: true, key: 'o' };
+    renderSavePersonShortcutDisplay();
   }
   if (changes.totalCopies) {
     totalCopies = changes.totalCopies.newValue || 0;

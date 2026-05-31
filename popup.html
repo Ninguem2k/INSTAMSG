@@ -112,7 +112,7 @@
         <button id="btn-clear-people" class="btn small danger">Limpar</button>
       </div>
       <ul class="msg-list people-list" id="people-list"></ul>
-      <p class="people-hint">
+      <p class="people-hint" id="people-hint">
         No Instagram, clique no <strong>@usuario</strong> e pressione <strong>Ctrl+O</strong> para salvar.
         Depois clique no nome aqui para abrir o chat.
       </p>
@@ -120,19 +120,34 @@
 
     <!-- Aba Atalho -->
     <section class="panel" id="panel-shortcut">
-      <div class="shortcut-hero">
-        <div class="shortcut-capture" id="shortcut-capture" tabindex="0">
-          <span class="shortcut-display" id="shortcut-display">Ctrl + I</span>
-          <span class="shortcut-hint" id="shortcut-hint">Clique aqui e pressione a nova tecla</span>
+      <div class="shortcut-section">
+        <h3 class="shortcut-label">Copiar mensagem</h3>
+        <div class="shortcut-hero">
+          <div class="shortcut-capture" id="shortcut-capture" tabindex="0">
+            <span class="shortcut-display" id="shortcut-display">Ctrl + I</span>
+            <span class="shortcut-hint" id="shortcut-hint">Clique aqui e pressione a nova tecla</span>
+          </div>
         </div>
+        <div class="shortcut-conflict" id="shortcut-conflict" style="display:none">
+          Atencao: este atalho pode conflitar com atalhos do navegador.
+        </div>
+        <p class="shortcut-desc" id="shortcut-desc"></p>
       </div>
-      <div class="shortcut-conflict" id="shortcut-conflict" style="display:none">
-        Atencao: este atalho pode conflitar com atalhos do navegador.
+
+      <div class="shortcut-section">
+        <h3 class="shortcut-label">Salvar @usuario</h3>
+        <div class="shortcut-hero">
+          <div class="shortcut-capture" id="saveperson-capture" tabindex="0">
+            <span class="shortcut-display" id="saveperson-display">Ctrl + O</span>
+            <span class="shortcut-hint" id="saveperson-hint">Clique aqui e pressione a nova tecla</span>
+          </div>
+        </div>
+        <div class="shortcut-conflict" id="saveperson-conflict" style="display:none">
+          Atencao: este atalho pode conflitar com atalhos do navegador.
+        </div>
+        <p class="shortcut-desc" id="saveperson-desc"></p>
       </div>
-      <p class="shortcut-desc" id="shortcut-desc">
-        Pressione <strong>Ctrl+I</strong> em qualquer pagina do Instagram para copiar
-        a proxima mensagem da lista e alternar ciclicamente.
-      </p>
+
       <div class="shortcut-status" id="shortcut-status">
         <span class="status-label">Posicao atual:</span>
         <span class="status-value" id="status-index">Nenhuma</span>

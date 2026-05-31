@@ -382,9 +382,21 @@ body {
 }
 
 /* ===== Shortcut Tab ===== */
+.shortcut-section {
+  margin-bottom: 20px;
+}
+.shortcut-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+  text-align: center;
+}
 .shortcut-hero {
   text-align: center;
-  margin: 16px 0 14px;
+  margin: 8px 0 10px;
 }
 .shortcut-capture {
   display: flex;
