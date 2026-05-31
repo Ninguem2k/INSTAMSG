@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InstaMSG</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">
+    <h1 class="logo">⚡ InstaMSG</h1>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="config">Config</button>
+    <button class="tab" data-tab="messages">Mensagens</button>
+    <button class="tab" data-tab="shortcut">Atalho</button>
+  </nav>
+
+  <main class="main">
+
+    <!-- Aba Config -->
+    <section class="panel active" id="panel-config">
+      <div class="field">
+        <label for="api-provider">Provedor de IA</label>
+        <select id="api-provider">
+          <option value="openai">OpenAI (GPT)</option>
+          <option value="deepseek">DeepSeek</option>
+          <option value="gemini">Google Gemini</option>
+          <option value="ollama">Ollama (local)</option>
+        </select>
+      </div>
+
+      <div class="field" id="field-api-key">
+        <label for="api-key">Chave de API</label>
+        <input type="password" id="api-key" placeholder="sk-... ou AIza...">
+        <small class="hint">Sua chave é salva apenas localmente no navegador.</small>
+      </div>
+
+      <div class="field" id="field-ollama-url" style="display:none">
+        <label for="ollama-url">URL do Ollama</label>
+        <input type="text" id="ollama-url" value="http://localhost:11434" placeholder="http://localhost:11434">
+      </div>
+
+      <div class="field" id="field-ollama-model" style="display:none">
+        <label for="ollama-model">Modelo</label>
+        <input type="text" id="ollama-model" value="llama3" placeholder="llama3, mistral, gemma...">
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label for="num-variations">Variações: <span id="num-label">5</span></label>
+          <input type="range" id="num-variations" min="2" max="10" value="5" step="1">
+        </div>
+        <div class="field">
+          <label for="temperature">Criatividade: <span id="temp-label">0.8</span></label>
+          <input type="range" id="temperature" min="0" max="2" value="0.8" step="0.1">
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="language">Idioma das variações</label>
+        <select id="language">
+          <option value="pt">Português</option>
+          <option value="en">English</option>
+          <option value="es">Español</option>
+          <option value="fr">Français</option>
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="base-text">Texto padrão (base)</label>
+        <textarea id="base-text" rows="4" placeholder="Digite sua mensagem base aqui...&#10;Ex: Olá, vi seu perfil e adorei seu estilo. Vamos marcar um café?"></textarea>
+      </div>
+
+      <button id="btn-generate" class="btn primary full">
+        <span class="btn-text">Gerar variações com IA</span>
+        <span class="spinner" style="display:none"></span>
+      </button>
+      <div id="generate-error" class="error" style="display:none"></div>
+    </section>
+
+    <!-- Aba Mensagens -->
+    <section class="panel" id="panel-messages">
+      <div class="msg-toolbar">
+        <span class="msg-count" id="msg-count">0 mensagens</span>
+        <button id="btn-add-msg" class="btn small secondary">+ Adicionar</button>
+      </div>
+      <ul class="msg-list" id="msg-list"></ul>
+      <div class="msg-actions">
+        <button id="btn-save" class="btn primary full">Salvar lista</button>
+      </div>
+    </section>
+
+    <!-- Aba Atalho -->
+    <section class="panel" id="panel-shortcut">
+      <div class="shortcut-hero">
+        <kbd>Ctrl</kbd> + <kbd>I</kbd>
+      </div>
+      <p class="shortcut-desc">
+        Pressione <strong>Ctrl+I</strong> em qualquer página do Instagram para copiar
+        a próxima mensagem da lista e alternar ciclicamente.
+      </p>
+      <div class="shortcut-status" id="shortcut-status">
+        <span class="status-label">Posição atual:</span>
+        <span class="status-value" id="status-index">Nenhuma</span>
+      </div>
+      <button id="btn-copy-now" class="btn primary full">Copiar mensagem atual</button>
+      <div id="copy-toast" class="copy-toast" style="display:none">Copiado!</div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    <span class="status" id="status-bar">Pronto</span>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
