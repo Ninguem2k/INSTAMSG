@@ -385,7 +385,7 @@ function buildPrompt(text, n, temp, lang) {
     `- IMPORTANTE: Se a mensagem original contiver placeholders como {nome}, {empresa}, {cidade}, etc., mantenha-os EXATAMENTE iguais em todas as variacoes geradas. Substitua apenas o texto ao redor deles.`,
     `- Use o idioma: ${langNames[lang] || lang}.`,
     `- Nivel de criatividade: ${temp} (0 = conservador, 2 = muito criativo).`,
-    `- Responda APENAS com as ${n} variacoes, uma por linha, sem numeracao, sem aspas, sem texto adicional.`,
+    `- Responda APENAS com as ${n} variacoes. Separe cada variacao com "---" em uma linha propria. Nao use numeracao, aspas, nem texto adicional. Cada variacao pode ter multiplas linhas se necessario.`,
     ``,
     `Mensagem original:`,
     text
@@ -393,10 +393,15 @@ function buildPrompt(text, n, temp, lang) {
 }
 
 function parseResponse(raw, n) {
+  // Split by "---" separator, not by line — each variation may be multi-line
   return raw
-    .split('\n')
-    .map(line => line.replace(/^\d+[\.\)]\s*/, '').replace(/^["']|["']$/g, '').trim())
-    .filter(line => line.length > 0)
+    .split(/\n?---\n?/)
+    .map(block => block
+      .replace(/^\d+[\.\)\-]\s*/gm, '')  // remove leading numbers/bullets
+      .replace(/^["']|["']$/g, '')        // strip surrounding quotes
+      .trim()
+    )
+    .filter(block => block.length > 0)
     .slice(0, n);
 }
 
@@ -415,7 +420,7 @@ async function callOpenAICompat(endpoint, model, prompt, key, temp, n) {
         { role: 'user', content: prompt }
       ],
       temperature: temp,
-      max_tokens: 150 * n
+      max_tokens: 400 * n
     })
   });
 
@@ -444,7 +449,7 @@ async function callGemini(prompt, key, temp, n) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { temperature: temp, maxOutputTokens: 150 * n }
+        generationConfig: { temperature: temp, maxOutputTokens: 400 * n }
       })
     }
   );
@@ -466,7 +471,7 @@ async function callOllama(prompt, url, model, temp, n) {
       model,
       prompt,
       stream: false,
-      options: { temperature: temp, num_predict: 150 * n }
+      options: { temperature: temp, num_predict: 400 * n }
     })
   });
 
