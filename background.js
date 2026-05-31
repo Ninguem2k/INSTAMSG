@@ -1,14 +1,14 @@
 /* global chrome */
 
-// Service worker — minimal: handles cross-context messaging and install.
-
 chrome.runtime.onInstalled.addListener(() => {
-  // Initialize default settings
-  chrome.storage.local.get('messages', (result) => {
-    if (!result.messages) {
+  chrome.storage.local.get('_schemaVersion', (result) => {
+    if (!result._schemaVersion) {
       chrome.storage.local.set({
-        messages: [],
-        currentIndex: 0,
+        groups: {
+          default: { name: 'Geral', messages: [], currentIndex: 0, createdAt: Date.now() }
+        },
+        activeGroupId: 'default',
+        shortcut: { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' },
         baseText: '',
         apiProvider: 'openai',
         apiKey: '',
@@ -16,13 +16,14 @@ chrome.runtime.onInstalled.addListener(() => {
         ollamaModel: 'llama3',
         temperature: 0.8,
         numVariations: 5,
-        language: 'pt'
+        language: 'pt',
+        _schemaVersion: 2
       });
     }
   });
 });
 
-// Relay copy-next requests from popup to active Instagram tab
+// Relay copy-next from popup to Instagram content script
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.action === 'copyNextFromPopup') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -35,6 +36,6 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         sendResponse({ ok: false, error: 'not on instagram' });
       }
     });
-    return true; // async
+    return true;
   }
 });

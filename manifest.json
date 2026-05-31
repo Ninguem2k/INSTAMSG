@@ -4,13 +4,13 @@
   "version": "1.0.0",
   "description": "Gere variações personalizadas de mensagens com IA e envie rapidamente no Instagram com Ctrl+I.",
   "permissions": ["storage", "clipboardWrite", "scripting"],
-  "host_permissions": ["*://*.instagram.com/*"],
+  "host_permissions": ["*://*.instagram.com/*", "*://instagram.com/*"],
   "content_scripts": [
     {
-      "matches": ["*://*.instagram.com/*"],
+      "matches": ["*://*.instagram.com/*", "*://instagram.com/*"],
       "js": ["content.js"],
       "css": ["toast.css"],
-      "run_at": "document_end"
+      "run_at": "document_start"
     }
   ],
   "action": {

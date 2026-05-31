@@ -8,7 +8,13 @@
 </head>
 <body>
   <header class="header">
-    <h1 class="logo">⚡ InstaMSG</h1>
+    <h1 class="logo">InstaMSG</h1>
+    <div class="header-row">
+      <div class="group-selector-wrapper">
+        <select id="group-selector" class="group-selector"></select>
+        <button id="btn-manage-groups" class="btn-icon" title="Gerenciar grupos">&#9881;</button>
+      </div>
+    </div>
   </header>
 
   <nav class="tabs">
@@ -34,7 +40,7 @@
       <div class="field" id="field-api-key">
         <label for="api-key">Chave de API</label>
         <input type="password" id="api-key" placeholder="sk-... ou AIza...">
-        <small class="hint">Sua chave é salva apenas localmente no navegador.</small>
+        <small class="hint">Sua chave e salva apenas localmente no navegador.</small>
       </div>
 
       <div class="field" id="field-ollama-url" style="display:none">
@@ -49,7 +55,7 @@
 
       <div class="row">
         <div class="field">
-          <label for="num-variations">Variações: <span id="num-label">5</span></label>
+          <label for="num-variations">Variacoes: <span id="num-label">5</span></label>
           <input type="range" id="num-variations" min="2" max="10" value="5" step="1">
         </div>
         <div class="field">
@@ -59,25 +65,28 @@
       </div>
 
       <div class="field">
-        <label for="language">Idioma das variações</label>
+        <label for="language">Idioma das variacoes</label>
         <select id="language">
-          <option value="pt">Português</option>
+          <option value="pt">Portugues</option>
           <option value="en">English</option>
-          <option value="es">Español</option>
-          <option value="fr">Français</option>
+          <option value="es">Espanol</option>
+          <option value="fr">Francais</option>
           <option value="de">Deutsch</option>
           <option value="it">Italiano</option>
         </select>
       </div>
 
       <div class="field">
-        <label for="base-text">Texto padrão (base)</label>
-        <textarea id="base-text" rows="4" placeholder="Digite sua mensagem base aqui...&#10;Ex: Olá, vi seu perfil e adorei seu estilo. Vamos marcar um café?"></textarea>
+        <label for="base-text">Texto padrao (base)</label>
+        <textarea id="base-text" rows="4" placeholder="Digite sua mensagem base aqui...&#10;Ex: Ola {nome}, vi seu perfil e adorei seu estilo. Vamos marcar um cafe?"></textarea>
       </div>
 
       <button id="btn-generate" class="btn primary full">
-        <span class="btn-text">Gerar variações com IA</span>
+        <span class="btn-text">Gerar variacoes com IA</span>
         <span class="spinner" style="display:none"></span>
+      </button>
+      <button id="btn-clear-generate" class="btn danger full btn-clear-gen" style="display:none">
+        Limpar e Gerar Novas
       </button>
       <div id="generate-error" class="error" style="display:none"></div>
     </section>
@@ -86,6 +95,7 @@
     <section class="panel" id="panel-messages">
       <div class="msg-toolbar">
         <span class="msg-count" id="msg-count">0 mensagens</span>
+        <span class="msg-group-badge" id="msg-group-badge">Geral</span>
         <button id="btn-add-msg" class="btn small secondary">+ Adicionar</button>
       </div>
       <ul class="msg-list" id="msg-list"></ul>
@@ -97,14 +107,20 @@
     <!-- Aba Atalho -->
     <section class="panel" id="panel-shortcut">
       <div class="shortcut-hero">
-        <kbd>Ctrl</kbd> + <kbd>I</kbd>
+        <div class="shortcut-capture" id="shortcut-capture" tabindex="0">
+          <span class="shortcut-display" id="shortcut-display">Ctrl + I</span>
+          <span class="shortcut-hint" id="shortcut-hint">Clique aqui e pressione a nova tecla</span>
+        </div>
       </div>
-      <p class="shortcut-desc">
-        Pressione <strong>Ctrl+I</strong> em qualquer página do Instagram para copiar
-        a próxima mensagem da lista e alternar ciclicamente.
+      <div class="shortcut-conflict" id="shortcut-conflict" style="display:none">
+        Atencao: este atalho pode conflitar com atalhos do navegador.
+      </div>
+      <p class="shortcut-desc" id="shortcut-desc">
+        Pressione <strong>Ctrl+I</strong> em qualquer pagina do Instagram para copiar
+        a proxima mensagem da lista e alternar ciclicamente.
       </p>
       <div class="shortcut-status" id="shortcut-status">
-        <span class="status-label">Posição atual:</span>
+        <span class="status-label">Posicao atual:</span>
         <span class="status-value" id="status-index">Nenhuma</span>
       </div>
       <button id="btn-copy-now" class="btn primary full">Copiar mensagem atual</button>
@@ -112,6 +128,20 @@
     </section>
 
   </main>
+
+  <!-- Dialog de Gerenciamento de Grupos -->
+  <div class="dialog-overlay" id="dialog-overlay" style="display:none">
+    <div class="dialog" id="dialog-groups">
+      <div class="dialog-header">
+        <h2>Gerenciar Grupos</h2>
+        <button class="btn-close" id="btn-close-dialog">&times;</button>
+      </div>
+      <ul class="group-manage-list" id="group-manage-list"></ul>
+      <div class="dialog-footer">
+        <button id="btn-create-group" class="btn primary full">+ Criar novo grupo</button>
+      </div>
+    </div>
+  </div>
 
   <footer class="footer">
     <span class="status" id="status-bar">Pronto</span>

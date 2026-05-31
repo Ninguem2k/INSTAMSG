@@ -1,15 +1,21 @@
 /* global chrome */
 
 // ── Constants ──────────────────────────────────────────────
-const STORAGE_KEYS = ['messages', 'currentIndex'];
 const TOAST_DURATION = 2500;
+const SHORTCUT_DEFAULTS = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
+
+// ── State ──────────────────────────────────────────────────
+let currentShortcut = { ...SHORTCUT_DEFAULTS };
+let keydownHandler = null;
+let attached = false;
 
 // ── Toast ──────────────────────────────────────────────────
 let toastEl = null;
 let toastTimer = null;
 
 function ensureToast() {
-  if (toastEl && document.body.contains(toastEl)) return;
+  if (toastEl && document.body && document.body.contains(toastEl)) return;
+  if (!document.body) return;
   toastEl = document.createElement('div');
   toastEl.id = 'instamsg-toast';
   document.body.appendChild(toastEl);
@@ -17,11 +23,12 @@ function ensureToast() {
 
 function showToast(text) {
   ensureToast();
+  if (!toastEl) return;
   toastEl.textContent = text;
   toastEl.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => {
-    toastEl.classList.remove('show');
+    if (toastEl) toastEl.classList.remove('show');
   }, TOAST_DURATION);
 }
 
@@ -30,8 +37,7 @@ async function copyToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
     return true;
-  } catch (err) {
-    // Fallback for older browsers
+  } catch {
     try {
       const ta = document.createElement('textarea');
       ta.value = text;
@@ -50,18 +56,26 @@ async function copyToClipboard(text) {
   }
 }
 
-// ── Cycle logic ────────────────────────────────────────────
+// ── Cycle logic (group-aware) ──────────────────────────────
 async function copyNextMessage() {
-  const result = await chrome.storage.local.get(STORAGE_KEYS);
-  const messages = result.messages || [];
-  let index = result.currentIndex || 0;
+  const result = await chrome.storage.local.get(['groups', 'activeGroupId']);
+  const groups = result.groups || {};
+  const gid = result.activeGroupId;
+  const group = groups[gid];
+
+  if (!group) {
+    showToast('InstaMSG: Nenhum grupo ativo.');
+    return;
+  }
+
+  const messages = group.messages || [];
+  let index = group.currentIndex || 0;
 
   if (messages.length === 0) {
     showToast('InstaMSG: Nenhuma mensagem na lista.');
     return;
   }
 
-  // Clamp index
   if (index >= messages.length) index = 0;
 
   const message = messages[index];
@@ -69,34 +83,111 @@ async function copyNextMessage() {
 
   if (ok) {
     const newIndex = (index + 1) % messages.length;
-    await chrome.storage.local.set({ currentIndex: newIndex });
-    showToast(`InstaMSG: Mensagem ${index + 1} de ${messages.length} copiada`);
+    groups[gid].currentIndex = newIndex;
+    await chrome.storage.local.set({ groups });
+    showToast(`InstaMSG: Mensagem ${index + 1}/${messages.length} copiada`);
   } else {
     showToast('InstaMSG: Erro ao copiar mensagem.');
   }
 }
 
-// ── Keyboard listener ──────────────────────────────────────
-function handleKeydown(e) {
-  // Ctrl+I or Cmd+I (Mac)
-  if ((e.ctrlKey || e.metaKey) && e.key === 'i' && !e.altKey && !e.shiftKey) {
-    // Don't intercept if user is typing in an input/textarea
-    const tag = e.target.tagName.toLowerCase();
-    const isEditable = e.target.isContentEditable || tag === 'input' || tag === 'textarea';
-    if (isEditable) return;
+// ── Dynamic keyboard shortcut ──────────────────────────────
+function buildShortcutHandler(sc) {
+  return function handleKeydown(e) {
+    if (!sc || !sc.key) return;
 
-    e.preventDefault();
-    e.stopPropagation();
-    copyNextMessage();
+    const ctrlMatch = sc.ctrlKey ? (e.ctrlKey || e.metaKey) : (!e.ctrlKey && !e.metaKey);
+    const shiftMatch = sc.shiftKey ? e.shiftKey : !e.shiftKey;
+    const altMatch = sc.altKey ? e.altKey : !e.altKey;
+    const metaMatch = sc.metaKey ? e.metaKey : true;
+
+    if (ctrlMatch && shiftMatch && altMatch && metaMatch && e.key.toLowerCase() === sc.key.toLowerCase()) {
+      e.preventDefault();
+      e.stopPropagation();
+      copyNextMessage();
+    }
+  };
+}
+
+// ── Attach / detach listener ───────────────────────────────
+function attachListener() {
+  if (attached && keydownHandler) return;
+  if (keydownHandler) {
+    document.removeEventListener('keydown', keydownHandler, true);
+    window.removeEventListener('keydown', keydownHandler, true);
+  }
+  keydownHandler = buildShortcutHandler(currentShortcut);
+  // Both document and window for maximum coverage in SPAs
+  document.addEventListener('keydown', keydownHandler, true);
+  window.addEventListener('keydown', keydownHandler, true);
+  attached = true;
+}
+
+async function initShortcut() {
+  const result = await chrome.storage.local.get('shortcut');
+  currentShortcut = result.shortcut || { ...SHORTCUT_DEFAULTS };
+  attachListener();
+}
+
+// ── SPA navigation guard ───────────────────────────────────
+// Instagram SPA may detach listeners on route change.
+// MutationObserver on body ensures we re-attach if body is replaced.
+function startBodyObserver() {
+  const observer = new MutationObserver(() => {
+    if (!document.body) return;
+    ensureToast();
+    // Re-attach on any major DOM mutation that could indicate SPA nav
+    attachListener();
+  });
+
+  const config = { childList: true, subtree: true };
+  if (document.body) {
+    observer.observe(document.body, config);
+  } else {
+    // Body not ready yet — wait for it
+    const bodyCheck = setInterval(() => {
+      if (document.body) {
+        observer.observe(document.body, config);
+        clearInterval(bodyCheck);
+        attachListener();
+        ensureToast();
+      }
+    }, 200);
   }
 }
 
-document.addEventListener('keydown', handleKeydown, true);
+// ── URL change detection (SPA routing) ─────────────────────
+let lastUrl = location.href;
+function checkUrlChange() {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    // SPA route changed — ensure listener is attached
+    attachListener();
+  }
+}
+setInterval(checkUrlChange, 1000);
 
-// ── Listen for copy-now message from popup ─────────────────
+// Also hook into popstate/hashchange
+window.addEventListener('popstate', () => { lastUrl = location.href; attachListener(); });
+window.addEventListener('hashchange', () => { lastUrl = location.href; attachListener(); });
+
+// ── Storage change listener ────────────────────────────────
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.shortcut) {
+    currentShortcut = changes.shortcut.newValue || { ...SHORTCUT_DEFAULTS };
+    attached = false;
+    attachListener();
+  }
+});
+
+// ── Message relay from popup ───────────────────────────────
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg.action === 'copyNext') {
     copyNextMessage().then(() => sendResponse({ ok: true }));
-    return true; // async response
+    return true;
   }
 });
+
+// ── Init ───────────────────────────────────────────────────
+initShortcut();
+startBodyObserver();
