@@ -212,9 +212,20 @@ function buildSavePersonHandler() {
 let savePersonHandler = null;
 
 function extractUsername(text) {
-  const cleaned = text.trim().replace(/^@/, '');
-  const match = cleaned.match(/^([a-zA-Z0-9._]{1,30})$/);
-  return match ? match[1] : null;
+  // Try extracting from Instagram URL: https://www.instagram.com/username/...
+  let match = text.match(/instagram\.com\/([a-zA-Z0-9._]{1,30})\/?/);
+  if (match) return match[1];
+
+  // Try finding @username pattern anywhere in text
+  match = text.match(/@([a-zA-Z0-9._]{1,30})/);
+  if (match) return match[1];
+
+  // Try whole text (after trimming) as bare username
+  const cleaned = text.trim();
+  match = cleaned.match(/^([a-zA-Z0-9._]{1,30})$/);
+  if (match) return match[1];
+
+  return null;
 }
 
 async function readClipboardText() {
