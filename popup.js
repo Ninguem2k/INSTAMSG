@@ -774,7 +774,7 @@ function renderShortcutDisplay() {
   // Also update people hint
   if (peopleHint) {
     const spCombo = shortcutToText(savePersonShortcut);
-    peopleHint.innerHTML = `No Instagram, clique no <strong>@usuario</strong> e pressione <strong>${spCombo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
+    peopleHint.innerHTML = `Copie o <strong>@usuario</strong> no Instagram e pressione <strong>${spCombo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
   }
 }
 
@@ -791,10 +791,10 @@ function shortcutToText(sc) {
 function renderSavePersonShortcutDisplay() {
   const combo = shortcutToText(savePersonShortcut);
   savePersonDisplay.textContent = combo;
-  savePersonDesc.innerHTML = `Pressione <strong>${combo}</strong> em qualquer pagina do Instagram para salvar o @usuario clicado na lista de pessoas.`;
+  savePersonDesc.innerHTML = `Pressione <strong>${combo}</strong> em qualquer pagina do Instagram para ler o @usuario da area de transferencia e salvar na lista de pessoas.`;
 
   if (peopleHint) {
-    peopleHint.innerHTML = `No Instagram, clique no <strong>@usuario</strong> e pressione <strong>${combo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
+    peopleHint.innerHTML = `Copie o <strong>@usuario</strong> no Instagram e pressione <strong>${combo}</strong> para salvar. Depois clique no nome aqui para abrir o chat.`;
   }
 }
 

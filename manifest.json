@@ -3,7 +3,7 @@
   "name": "InstaMSG — Variações Inteligentes para Instagram",
   "version": "1.0.0",
   "description": "Gere variações personalizadas de mensagens com IA e envie rapidamente no Instagram com Ctrl+I.",
-  "permissions": ["storage", "clipboardWrite", "scripting"],
+  "permissions": ["storage", "clipboardWrite", "clipboardRead", "scripting"],
   "host_permissions": ["*://*.instagram.com/*", "*://instagram.com/*"],
   "content_scripts": [
     {

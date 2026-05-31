@@ -13,19 +13,6 @@ let currentShortcut = { ...SHORTCUT_DEFAULTS };
 let currentSavePersonShortcut = { ...SAVE_PERSON_SHORTCUT_DEFAULTS };
 let keydownHandler = null;
 let attached = false;
-let lastClickedUsername = null;
-
-// ── Click tracker: capture @username clicks ─────────────────
-document.addEventListener('click', (e) => {
-  const anchor = e.target.closest('a[href]');
-  if (!anchor) { lastClickedUsername = null; return; }
-  const href = anchor.getAttribute('href');
-  // Match Instagram profile links: /username/ or /username (with optional /)
-  const match = href.match(/^\/([a-zA-Z0-9._]{1,30})\/?$/);
-  if (match) {
-    lastClickedUsername = match[1];
-  }
-}, true);
 
 // ── Toast ──────────────────────────────────────────────────
 let toastEl = null;
@@ -224,12 +211,45 @@ function buildSavePersonHandler() {
 
 let savePersonHandler = null;
 
+function extractUsername(text) {
+  const cleaned = text.trim().replace(/^@/, '');
+  const match = cleaned.match(/^([a-zA-Z0-9._]{1,30})$/);
+  return match ? match[1] : null;
+}
+
+async function readClipboardText() {
+  try {
+    return await navigator.clipboard.readText();
+  } catch {
+    try {
+      const ta = document.createElement('textarea');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      ta.style.top = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      document.execCommand('paste');
+      const text = ta.value;
+      ta.remove();
+      return text;
+    } catch {
+      return null;
+    }
+  }
+}
+
 async function savePerson() {
-  if (!lastClickedUsername) {
-    showToast('InstaMSG: Clique em um @usuario primeiro.');
+  const text = await readClipboardText();
+  if (!text || !text.trim()) {
+    showToast('InstaMSG: Area de transferencia vazia.');
     return;
   }
-  const username = lastClickedUsername;
+
+  const username = extractUsername(text);
+  if (!username) {
+    showToast('InstaMSG: Texto nao parece um @usuario valido.');
+    return;
+  }
 
   const { people } = await chrome.storage.local.get('people');
   const list = people || [];
