@@ -20,6 +20,7 @@
   <nav class="tabs">
     <button class="tab active" data-tab="config">Config</button>
     <button class="tab" data-tab="messages">Mensagens</button>
+    <button class="tab" data-tab="people">Pessoas</button>
     <button class="tab" data-tab="shortcut">Atalho</button>
   </nav>
 
@@ -104,6 +105,19 @@
       </div>
     </section>
 
+    <!-- Aba Pessoas -->
+    <section class="panel" id="panel-people">
+      <div class="msg-toolbar">
+        <span class="msg-count" id="people-count">0 pessoas</span>
+        <button id="btn-clear-people" class="btn small danger">Limpar</button>
+      </div>
+      <ul class="msg-list people-list" id="people-list"></ul>
+      <p class="people-hint">
+        No Instagram, clique no <strong>@usuario</strong> e pressione <strong>Ctrl+O</strong> para salvar.
+        Depois clique no nome aqui para abrir o chat.
+      </p>
+    </section>
+
     <!-- Aba Atalho -->
     <section class="panel" id="panel-shortcut">
       <div class="shortcut-hero">
@@ -139,6 +153,36 @@
       <ul class="group-manage-list" id="group-manage-list"></ul>
       <div class="dialog-footer">
         <button id="btn-create-group" class="btn primary full">+ Criar novo grupo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dialog de Doacao -->
+  <div class="dialog-overlay" id="donation-overlay" style="display:none">
+    <div class="dialog donation-dialog">
+      <div class="dialog-header">
+        <h2>Apoie o Criador</h2>
+        <button class="btn-close" id="btn-close-donation">&times;</button>
+      </div>
+      <div class="donation-body">
+        <p class="donation-text">
+          Este complemento e gratuito e de codigo aberto.<br>
+          Se ele te ajuda, considere fazer uma doacao.
+        </p>
+        <div class="donation-qr-wrapper">
+          <img id="donation-qr" class="donation-qr"
+               src=""
+               alt="QR Code para doacao"
+               width="180" height="180">
+        </div>
+        <p class="donation-key-label">Chave Pix:</p>
+        <code class="donation-key" id="donation-key-display"></code>
+        <p class="donation-suggestion">Valor sugerido: R$ 5,00</p>
+        <p class="donation-note">Voce pode fechar e continuar usando normalmente.</p>
+      </div>
+      <div class="dialog-footer donation-footer">
+        <button id="btn-dismiss-donation" class="btn secondary full">Agora nao</button>
+        <button id="btn-donated" class="btn primary full">Ja doei! Remover por 30 dias</button>
       </div>
     </div>
   </div>

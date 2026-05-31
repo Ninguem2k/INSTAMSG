@@ -51,11 +51,32 @@ const btnCloseDialog = $('#btn-close-dialog');
 // Shared
 const statusBar = $('#status-bar');
 
+// People
+const peopleList = $('#people-list');
+const peopleCount = $('#people-count');
+const btnClearPeople = $('#btn-clear-people');
+
+// Donation dialog
+const donationOverlay = $('#donation-overlay');
+const donationQr = $('#donation-qr');
+const donationKeyDisplay = $('#donation-key-display');
+const btnCloseDonation = $('#btn-close-donation');
+const btnDismissDonation = $('#btn-dismiss-donation');
+const btnDonated = $('#btn-donated');
+
+// ── Donation config ────────────────────────────────────────
+const DONATION_PIX_KEY = 'ninguem2k@proton.me';
+const DONATION_MSG_INTERVAL = 10;   // show every N copies
+const DONATION_HIDE_DAYS = 30;      // hide duration when user clicks "ja doei"
+
 // ── State ──────────────────────────────────────────────────
 let groups = {};
 let activeGroupId = null;
 let shortcut = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
 let isRecording = false;
+let totalCopies = 0;
+let donationDismissedUntil = 0;
+let people = [];
 
 // ── Active group helpers ───────────────────────────────────
 function activeGroup() {
@@ -104,7 +125,8 @@ async function loadSettings() {
   const result = await chrome.storage.local.get([
     'baseText', 'groups', 'activeGroupId', 'shortcut',
     'apiProvider', 'apiKey', 'ollamaUrl', 'ollamaModel',
-    'temperature', 'numVariations', 'language', '_schemaVersion'
+    'temperature', 'numVariations', 'language', '_schemaVersion',
+    'totalCopies', 'donationDismissedUntil', 'people'
   ]);
 
   await migrateIfNeeded(result);
@@ -112,6 +134,9 @@ async function loadSettings() {
   groups = result.groups || {};
   activeGroupId = result.activeGroupId;
   shortcut = result.shortcut || { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
+  totalCopies = result.totalCopies || 0;
+  donationDismissedUntil = result.donationDismissedUntil || 0;
+  people = result.people || [];
 
   // Validate activeGroupId exists
   if (!groups[activeGroupId]) {
@@ -140,6 +165,7 @@ async function loadSettings() {
   updateProviderFields();
   renderGroupSelector();
   renderMessageList();
+  renderPeopleList();
   renderShortcutDisplay();
   updateShortcutStatus();
   toggleClearGenBtn();
@@ -149,6 +175,9 @@ async function loadSettings() {
   if (hasProvider && hasMessages) {
     switchTab('messages');
   }
+
+  // Check donation on load (catches copies made while popup was closed)
+  checkDonation();
 }
 
 // ── Save single setting ────────────────────────────────────
@@ -198,6 +227,54 @@ function switchTab(tabName) {
 
 tabs.forEach(tab => {
   tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+});
+
+// ── People: Render list ─────────────────────────────────────
+function renderPeopleList() {
+  peopleList.innerHTML = '';
+  peopleCount.textContent = `${people.length} pessoa${people.length !== 1 ? 's' : ''}`;
+
+  if (people.length === 0) {
+    peopleList.style.display = 'none';
+    btnClearPeople.style.display = 'none';
+    return;
+  }
+
+  peopleList.style.display = '';
+  btnClearPeople.style.display = '';
+
+  people.forEach((p, i) => {
+    const li = document.createElement('li');
+    li.className = 'msg-item people-item';
+    li.title = `Abrir chat com @${p.username}`;
+    li.innerHTML = `
+      <span class="index people-index">${i + 1}</span>
+      <span class="people-username">@${escapeHtml(p.username)}</span>
+      <button class="btn-remove people-remove" data-index="${i}" title="Remover">&times;</button>
+    `;
+    li.addEventListener('click', (e) => {
+      if (e.target.classList.contains('people-remove')) return;
+      chrome.tabs.create({ url: `https://www.instagram.com/${p.username}/` });
+    });
+    li.style.cursor = 'pointer';
+    peopleList.appendChild(li);
+  });
+
+  peopleList.querySelectorAll('.people-remove').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const idx = Number(btn.dataset.index);
+      people.splice(idx, 1);
+      await chrome.storage.local.set({ people });
+      renderPeopleList();
+    });
+  });
+}
+
+// Clear all people
+btnClearPeople.addEventListener('click', async () => {
+  people = [];
+  await chrome.storage.local.set({ people });
+  renderPeopleList();
 });
 
 // ── Group: Render selector ─────────────────────────────────
@@ -786,6 +863,7 @@ btnCopyNow.addEventListener('click', async () => {
     await navigator.clipboard.writeText(msg);
 
     highlightMessageItem(idx);
+    incrementCopyCount();
 
     copyToast.style.display = 'block';
     copyToast.textContent = `Copiada: Mensagem ${idx + 1} de ${msgs.length}`;
@@ -832,6 +910,59 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
     renderShortcutDisplay();
     checkShortcutConflicts();
   }
+  if (changes.totalCopies) {
+    totalCopies = changes.totalCopies.newValue || 0;
+    checkDonation();
+  }
+  if (changes.people) {
+    people = changes.people.newValue || [];
+    renderPeopleList();
+  }
+});
+
+// ── Donation ───────────────────────────────────────────────
+function updateDonationQr() {
+  const data = encodeURIComponent(DONATION_PIX_KEY);
+  donationQr.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${data}`;
+  donationKeyDisplay.textContent = DONATION_PIX_KEY;
+}
+
+function showDonationDialog() {
+  updateDonationQr();
+  donationOverlay.style.display = 'flex';
+}
+
+function hideDonationDialog() {
+  donationOverlay.style.display = 'none';
+}
+
+async function checkDonation() {
+  const now = Date.now();
+  if (donationDismissedUntil > now) return;
+  if (totalCopies > 0 && totalCopies % DONATION_MSG_INTERVAL === 0) {
+    showDonationDialog();
+  }
+}
+
+async function incrementCopyCount() {
+  totalCopies++;
+  await chrome.storage.local.set({ totalCopies });
+  checkDonation();
+}
+
+// Donation dialog buttons
+btnCloseDonation.addEventListener('click', hideDonationDialog);
+btnDismissDonation.addEventListener('click', hideDonationDialog);
+
+btnDonated.addEventListener('click', async () => {
+  donationDismissedUntil = Date.now() + DONATION_HIDE_DAYS * 24 * 60 * 60 * 1000;
+  await chrome.storage.local.set({ donationDismissedUntil });
+  hideDonationDialog();
+  statusBar.textContent = 'Valeu pelo apoio!';
+});
+
+donationOverlay.addEventListener('click', (e) => {
+  if (e.target === donationOverlay) hideDonationDialog();
 });
 
 // ── Init ───────────────────────────────────────────────────

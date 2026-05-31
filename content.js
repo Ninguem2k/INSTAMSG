@@ -3,11 +3,27 @@
 // ── Constants ──────────────────────────────────────────────
 const TOAST_DURATION = 2500;
 const SHORTCUT_DEFAULTS = { ctrlKey: true, shiftKey: false, altKey: false, metaKey: false, key: 'i' };
+const DONATION_PIX_KEY = 'ninguem2k@proton.me';
+const DONATION_MSG_INTERVAL = 10;
+const DONATION_HIDE_DAYS = 30;
 
 // ── State ──────────────────────────────────────────────────
 let currentShortcut = { ...SHORTCUT_DEFAULTS };
 let keydownHandler = null;
 let attached = false;
+let lastClickedUsername = null;
+
+// ── Click tracker: capture @username clicks ─────────────────
+document.addEventListener('click', (e) => {
+  const anchor = e.target.closest('a[href]');
+  if (!anchor) { lastClickedUsername = null; return; }
+  const href = anchor.getAttribute('href');
+  // Match Instagram profile links: /username/ or /username (with optional /)
+  const match = href.match(/^\/([a-zA-Z0-9._]{1,30})\/?$/);
+  if (match) {
+    lastClickedUsername = match[1];
+  }
+}, true);
 
 // ── Toast ──────────────────────────────────────────────────
 let toastEl = null;
@@ -30,6 +46,76 @@ function showToast(text) {
   toastTimer = setTimeout(() => {
     if (toastEl) toastEl.classList.remove('show');
   }, TOAST_DURATION);
+}
+
+// ── Donation overlay ───────────────────────────────────────
+let donationOverlay = null;
+
+function buildDonationOverlay() {
+  if (donationOverlay) return donationOverlay;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'instamsg-donation-overlay';
+  overlay.innerHTML = `
+    <div id="instamsg-donation-dialog">
+      <div id="instamsg-donation-header">
+        <span>Apoie o Criador</span>
+        <button id="instamsg-donation-close">&times;</button>
+      </div>
+      <div id="instamsg-donation-body">
+        <p>Este complemento e gratuito e de codigo aberto.<br>Se ele te ajuda, considere fazer uma doacao.</p>
+        <div id="instamsg-donation-qr-wrapper">
+          <img id="instamsg-donation-qr" src="" alt="QR Code Pix" width="180" height="180">
+        </div>
+        <p id="instamsg-donation-key-label">Chave Pix:</p>
+        <code id="instamsg-donation-key">${DONATION_PIX_KEY}</code>
+        <p id="instamsg-donation-suggestion">Valor sugerido: R$ 5,00</p>
+        <p id="instamsg-donation-note">Voce pode fechar e continuar usando normalmente.</p>
+      </div>
+      <div id="instamsg-donation-footer">
+        <button id="instamsg-donation-dismiss">Agora nao</button>
+        <button id="instamsg-donation-donated">Ja doei! Remover por 30 dias</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+  donationOverlay = overlay;
+
+  const qrImg = overlay.querySelector('#instamsg-donation-qr');
+  qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(DONATION_PIX_KEY)}`;
+
+  overlay.querySelector('#instamsg-donation-close').addEventListener('click', hideDonationDialog);
+  overlay.querySelector('#instamsg-donation-dismiss').addEventListener('click', hideDonationDialog);
+  overlay.querySelector('#instamsg-donation-donated').addEventListener('click', async () => {
+    const hideUntil = Date.now() + DONATION_HIDE_DAYS * 24 * 60 * 60 * 1000;
+    await chrome.storage.local.set({ donationDismissedUntil: hideUntil });
+    hideDonationDialog();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) hideDonationDialog();
+  });
+
+  return overlay;
+}
+
+function showDonationDialog() {
+  if (!document.body) return;
+  const overlay = buildDonationOverlay();
+  overlay.style.display = 'flex';
+}
+
+function hideDonationDialog() {
+  if (donationOverlay) donationOverlay.style.display = 'none';
+}
+
+async function checkDonation(totalCopies) {
+  const { donationDismissedUntil } = await chrome.storage.local.get('donationDismissedUntil');
+  const dismissed = donationDismissedUntil || 0;
+  if (dismissed > Date.now()) return;
+  if (totalCopies > 0 && totalCopies % DONATION_MSG_INTERVAL === 0) {
+    showDonationDialog();
+  }
 }
 
 // ── Clipboard ──────────────────────────────────────────────
@@ -84,8 +170,14 @@ async function copyNextMessage() {
   if (ok) {
     const newIndex = (index + 1) % messages.length;
     groups[gid].currentIndex = newIndex;
-    await chrome.storage.local.set({ groups });
+
+    // Increment total copy counter for donation nudge
+    const { totalCopies } = await chrome.storage.local.get('totalCopies');
+    const newTotal = (totalCopies || 0) + 1;
+
+    await chrome.storage.local.set({ groups, totalCopies: newTotal });
     showToast(`InstaMSG: Mensagem ${index + 1}/${messages.length} copiada`);
+    checkDonation(newTotal);
   } else {
     showToast('InstaMSG: Erro ao copiar mensagem.');
   }
@@ -109,6 +201,39 @@ function buildShortcutHandler(sc) {
   };
 }
 
+// ── Ctrl+O: save person ─────────────────────────────────────
+function buildSavePersonHandler() {
+  return function handleKeydown(e) {
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === 'o') {
+      e.preventDefault();
+      e.stopPropagation();
+      savePerson();
+    }
+  };
+}
+
+let savePersonHandler = null;
+
+async function savePerson() {
+  if (!lastClickedUsername) {
+    showToast('InstaMSG: Clique em um @usuario primeiro.');
+    return;
+  }
+  const username = lastClickedUsername;
+
+  const { people } = await chrome.storage.local.get('people');
+  const list = people || [];
+
+  if (list.some(p => p.username === username)) {
+    showToast(`InstaMSG: @${username} ja esta na lista.`);
+    return;
+  }
+
+  list.push({ username, savedAt: Date.now() });
+  await chrome.storage.local.set({ people: list });
+  showToast(`InstaMSG: @${username} salvo! (${list.length} pessoa${list.length !== 1 ? 's' : ''})`);
+}
+
 // ── Attach / detach listener ───────────────────────────────
 function attachListener() {
   if (attached && keydownHandler) return;
@@ -116,10 +241,17 @@ function attachListener() {
     document.removeEventListener('keydown', keydownHandler, true);
     window.removeEventListener('keydown', keydownHandler, true);
   }
+  if (savePersonHandler) {
+    document.removeEventListener('keydown', savePersonHandler, true);
+    window.removeEventListener('keydown', savePersonHandler, true);
+  }
   keydownHandler = buildShortcutHandler(currentShortcut);
+  savePersonHandler = buildSavePersonHandler();
   // Both document and window for maximum coverage in SPAs
   document.addEventListener('keydown', keydownHandler, true);
   window.addEventListener('keydown', keydownHandler, true);
+  document.addEventListener('keydown', savePersonHandler, true);
+  window.addEventListener('keydown', savePersonHandler, true);
   attached = true;
 }
 
